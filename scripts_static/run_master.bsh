@@ -1,0 +1,5 @@
+#!/bin/bash
+#CONSIDER: what parts of master.bsh to run (by commenting out unwanted portions) and appropriate logfile name
+
+date_stamp=$(date +"%F-%H-%M")
+nohup ./master.bsh > "log_master_$date_stamp.txt" 2>&1 &

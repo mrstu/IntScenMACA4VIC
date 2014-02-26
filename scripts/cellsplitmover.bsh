@@ -1,0 +1,15 @@
+#!/bin/bash
+
+nodedir=$1
+raiddir=$2
+splitfile=$3
+scen=$4 #"rcp45"
+gcm=$5 #"CanESM2"
+
+#frcdirs=$(echo $storedir/vicfrc/{pr,tasmax,tasmin,was}_cells/$scen/$gcm)
+
+while read line
+do
+    ind=$(echo $line | cut -f1 -d" ")
+    cp $nodedir/$ind $raiddir/$ind
+done < $splitfile

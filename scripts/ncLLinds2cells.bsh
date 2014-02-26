@@ -1,0 +1,69 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -S /bin/bash 
+#$ -q default.q@compute-0-0,default.q@compute-0-1,default.q@compute-0-2,default.q@compute-0-17,default.q@compute-0-18,default.q@compute-0-19,default.q@compute-2-*
+##$ -M mrstu@uw.edu
+##$ -m beas
+export PYTHONPATH=/home/stumbaugh
+
+#
+# From lats,lons,indices table and NetCDF file to ascii cells.
+#
+
+#infile="/raid3/stumbaugh/IS/CONUS/v2.2/splitmon/was/historical/CanESM2/2005-12-01_2005-12-31"
+#varname=wind_speed
+scen=$1 #"historical"
+gcm=$2 #"CanESM2"
+#indir="/raid3/stumbaugh/IS/CONUS/v2.2/splitmon/tasmax/historical/CanESM2/2004-*"
+indir="/raid3/stumbaugh/IS/CONUS/v2.2/splitmon"
+outdir="/raid3/stumbaugh/IS/CONUS/v2.2/nc2forcings_dump"
+varname=air_temp_tmax
+
+
+if [ 0 -eq 1 ]
+then 
+
+# Get lat,lon and format output table
+ncks -C -H -d time,1 -v $varname $infile | awk '{split($2,lat,"="); split($3,lon,"="); split($4,val,"="); printf("%4.5f %4.5f %s\n", lat[2], lon[2], val[2])}' > latlons.txt
+
+# Get ilat,jlon,values and format output table
+ncks -C -H -d time,1 -v $varname $infile | awk -F'[][]' '{print $4, $6, $9}' > indvals.txt
+
+# Combine <lats> <lons> <ilat> <jlon> <value> into one table
+## Convert lons from (0-360) to (-180-180)
+#paste -d" " latlons.txt indvals.txt | grep -v "_" |  head -n -1 | awk '{lon=$2-360.; $2=lon; printf("%4.4f5 %4.5f %d %d\n",$1,$2,$4,$5)}' > goodlatlons.txt
+paste -d" " latlons.txt indvals.txt | grep -v "_" |  head -n -1 | awk '{lon=$2; printf("%4.4f5 %4.5f %d %d\n",$1,$2,$4,$5)}' > goodlatlons.txt
+
+#split -n 1000 goodlatlons.txt > goodlatlons_1000.txt
+fi
+#python nc2cells_bylist.py goodlatlons.txt $infile $outdir
+cfgfile_precip_units="precip2mm_day.cfg"
+cfgfile_temp_units="tempC2K.cfg"
+cfgfile="nc2txt.cfg"
+rm $cfgfile $cfgfile_precip_units $cfgfile_temp_units
+# don't use precip or temp list of monthly files b/c "_scaled" (mm/day; deg K->C) files present.
+for iinfile in $(ls $indir/was/$scen/$gcm)
+do
+	for varname in huss pr rsds tasmax tasmin was
+	do
+	    #outname=$(basename $iinfile)
+	    outpath=$outdir/$varname/$scen/$gcm
+	    mkdir -p $outpath
+	    #if [ $varname == "pr" ]
+	    # then
+	        ## kg/(m2-s2) to mm/day
+            #echo 'cdo mulc,86400.' $indir/$varname/$scen/$gcm/$iinfile $indir/$varname/$scen/$gcm/$iinfile"_scaled" >> $cfgfile_precip_units
+            #echo 'cdo outputf,"%4.3f ",153624' $indir/$varname/$scen/$gcm/$iinfile"_scaled"' > '$outpath/$iinfile >> $cfgfile
+        if [[ "$varname" == tas* ]]
+        then
+            echo 'cdo subc,273.15' $indir/$varname/$scen/$gcm/$iinfile $indir/$varname/$scen/$gcm/$iinfile"_scaled" >> $cfgfile_temp_units
+            echo 'cdo outputf,"%4.3f ",153624' $indir/$varname/$scen/$gcm/$iinfile"_scaled"' > '$outpath/$iinfile >> $cfgfile
+        else
+    	    echo 'cdo outputf,"%4.3f ",153624' $indir/$varname/$scen/$gcm/$iinfile' > '$outpath/$iinfile >> $cfgfile
+        #echo 'cdo outputf,"%4.3f ",153624' $indir/$varname/$scen/$gcm/$iinfile' | awk '"'for(i=1;i<=NF;i++){if($i!=-9999.000){print count}'> '$outpath/$iinfile >> $cfgfile	    
+        #awk '{count=0; for(i=1;i<=NF;i++){if($i!=-9999.00000){print count}; count+=1;}}'
+	    #python nc2cells_bylist.py goodlatlons.txt $outdir $iinfile
+        fi
+	done
+done 

@@ -1,0 +1,53 @@
+var=$1 #"tasmin"
+scen=$2 #"rcp45"
+gcm=$3 #"CanESM2"
+syncdir=$4
+
+syncfile=$syncdir/$var"_"$scen"_"$gcm".txt"
+rm $syncfile
+
+echo "HOSTNAME="$(hostname) > $syncfile
+echo "STARTDATE="$(date) >> $syncfile
+
+mydir="/state/partition1/stumbaugh" #/fast/matt
+indir="/home/raid3/stumbaugh/IS/CONUS/v2"
+outdir=$mydir/$var"_catted"/$scen/$gcm
+outdir_cells=$mydir/$var"_cells"/$scen/$gcm
+outdir_final=$indir/vicfrc/$var"_cells"/$scen
+mkdir -p $mydir $outdir $outdir_cells $outdir_final
+
+echo "DIR_MONTHLY_TEXT="$indir/nc2forcings_dump/$var/$scen/$gcm >> $syncfile
+cat $indir/nc2forcings_dump/$var/$scen/$gcm/* > $outdir/all
+echo "FILE_CATFILE="$outdir/all >> $syncfile
+echo "STATUS_CATFILE=COMPLETED" >> $syncfile
+
+numsteps=$(wc -l "$outdir/all")
+
+#/home/stumbaugh/bin/cell_to_file /home/stumbaugh/downloader/IS/v2/dummy.nc.flatij.valinds.txt $outdir/all 6000 34675 $outdir_cells/
+/home/stumbaugh/bin/cell_to_file /home/stumbaugh/downloader/IS/v2/dummy.nc.flatij.valinds.txt $outdir/all 6000 $numsteps $outdir_cells/
+echo "DIR_CELLFILES="$outdir_cells/ >> $syncfile
+echo "STATUS_CELLFILES=COMPLETED" >> $syncfile
+
+numcells=$(find $outdir_cells/ -type f | wc -l)
+echo "NUMCELLS_ON_NODE="$numcells >> $syncfile
+
+cp -r $outdir_cells $outdir_final
+#mv $outdir_final/$var"_cells" $outdir_final/$var
+numcellsB=$(find $outdir_final/$gcm -type f | wc -l)
+echo "DIR_CELLFILES_FINAL="$outdir_final/$gcm >> $syncfile
+echo "NUMCELLS_ON_RAID3="$numcellsB >> $syncfile
+if [ $numcells -eq $numcellsB ]
+then
+    echo "STATUS_CELLFILES_FINAL=COMPLETED" >> $syncfile
+else
+    echo "STATUS_CELLFILES_FINAL=FAILED" >> $syncfile    
+fi
+
+echo "ENDDATE="$(date) >> $syncfile
+
+echo '#Please consider cleaning the following:' >> $syncfile
+echo '#FILE_CATFILE=' $(hostname)":"$outdir/all >> $syncfile
+echo '#DIR_CELLFILES_FINAL=' $(hostname)":"$outdir_final/$gcm >> $syncfile
+echo '#DIR_MONTHLY_TEXT=' $indir/nc2forcings_dump/$var/$scen/$gcm >> $syncfile
+
+echo "STATUS_JOB=FINISHED" >> $syncfile

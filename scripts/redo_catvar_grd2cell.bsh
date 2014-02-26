@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#
+# Consider turning off either cat or cell_to_file portions of catvar_grd2cell.bsh
+#
+
+cd CanESM2/rcp85/catvar_grd2cell
+baseq="catvar"
+cfg=$baseq".cfg"
+syncloc=../sync
+count=1
+while read line
+do
+    syncfile=$(echo $line | awk 'BEGIN{OFS="_"}{print $2, $3, $4}')
+    jhost=$(grep "HOSTNAME" $syncloc/$syncfile".txt" | sed 's/HOSTNAME=//g' | sed 's/\.local//g')
+    cfgseek=$(echo $syncfile | sed 's/_/ /g')
+    var=$(echo $cfgseek | cut -f1 -d" ")
+    rm $var".qsub" $var".cfg"
+    #grep "$cfgseek" $cfg > $var.cfg
+    cp $baseq".qsub" $var".qsub"
+    sed -i 's|#$ -t.*|#$ -t '$count'|g' $var".qsub"
+    sed -i 's|#$ -q.*|#$ -q default.q@'$jhost'|g' $var".qsub"
+    let count=count+1
+    qsub $var".qsub"
+done < $cfg

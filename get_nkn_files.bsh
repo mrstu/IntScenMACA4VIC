@@ -1,0 +1,30 @@
+
+ftpsrc="ftp.northwestknowledge.net"
+ftpdir="climate/macav2livneh"
+#files=$(curl -n -l ftp://ftp.northwestknowledge.net/climate/macav2livneh/)
+# put credentials in ~/.netrc
+files=$(curl -n -l -s ftp://$ftpsrc/$ftpdir/)
+echo $files
+# put credentials in ~/.wgetrc
+cmd="wget -nc -c -nd ftp://ftp.northwestknowledge.net/climate/macav2livneh"
+odir="/home/raid2/stumbaugh/IS/CONUS/v2.2/CSIRO"
+mkdir -p $odir
+#CSIRO-Mk3-6-0_historical_1950_1969_CONUS.nc
+#CSIRO-Mk3-6-0 CSIRO
+gcm="CSIRO"
+jobbase="wget_"$gcm
+
+rm $jobbase".cfg"
+
+for file in $files
+do
+    newfile=$(echo $file | sed 's|CSIRO-Mk3-6-0|CSIRO|g')
+    var=$(echo $newfile | awk -F_ '{print $2}')
+    if [ $var = "tasmax" ] || [ $var = "tasmin" ]
+    then
+        #echo $cmd/$file -P $odir/$newfile >> $jobbase".cfg"
+        echo $cmd/$file -P $odir/ >> $jobbase".cfg"
+    fi
+done
+
+mk_qsub.bsh $jobbase".qsub" $jobbase".cfg"

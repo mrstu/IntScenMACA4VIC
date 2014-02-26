@@ -1,0 +1,29 @@
+#!/bin/bash
+gcm=$1 # CanESM2|CCSM4|etc.
+namesfile=$2 #maca_files.txt cleaned to only have <http://*.nc>
+outdir=$3
+
+for scen in historical rcp45 rcp85
+do
+    mkdir -p $gcm/$scen
+    grep "$scen" $namesfile > $gcm/$scen/maca_files.txt
+    
+    cp scripts_static/run_master.bsh $gcm/$scen/run_master.bsh
+        
+    cd $gcm/$scen
+    python ~/bin/macainfo.py maca_files.txt
+
+    fsetup="setup.bsh"
+    echo '#!/bin/bash' > $fsetup
+    echo >> $fsetup
+    echo '### SETUP SGE CONFIG AND MASTER.BSH ###' >> $fsetup
+    echo '../../scripts/nc_loncut_lontrans.bsh {var,time}_groups.txt '$gcm $outdir  >> $fsetup
+    
+    ## Moved the following to scripts/static/run_master.bsh
+    #echo '#!/bin/bash' > run_master.bsh
+    #echo '#CONSIDER: what parts of master.bsh to run (by commenting out unwanted portions) and appropriate logfile name' >> run_master.bsh    
+    #echo 'nohup ./master.bsh > log_master.txt 2>&1 &' >> run_master.bsh    
+    chmod 744 $fsetup run_master.bsh
+    ./$fsetup
+    cd ../..
+done

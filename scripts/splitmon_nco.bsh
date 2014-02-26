@@ -1,0 +1,65 @@
+#!/bin/bash
+
+for infile in "${@:1}"
+do
+#infiles=$(find "/home/raid3/stumbaugh/IS/CONUS/v2.2/" -maxdepth 1 -type f)
+#for infile in $infiles
+#/home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1950_1969_CONUS.nc 
+#/home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1990_2005_CONUS.nc
+just_echo=0 # 0-run all infile # 1-just echo names of infiles
+#for infile in /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_huss_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_pr_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_rsds_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmin_daily_CanESM2_historical_1990_2005_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1950_1969_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1970_1989_CONUS.nc /home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_was_daily_CanESM2_historical_1990_2005_CONUS.nc
+
+echo $infile
+if [ $just_echo -eq 0 ]
+then    
+##ncap2 -O -s 'where(lon>180.) lon=lon-360' $infile $infile
+#infile="/home/raid3/stumbaugh/IS/CONUS/v2.2/macav2livneh_tasmax_daily_CanESM2_historical_1950_1969_CONUS.nc"
+filein=$(basename $infile)
+trans_name=$(echo $filein | awk -F_ '{printf("%s_%s_%s_%s_%s",$2,$3,$4,$5,$6)}') # tasmax_CanESM2_historical_1950_1969
+year_start=$(echo $trans_name |  awk -F_ '{print $4}')
+year_end=$(echo $trans_name |  awk -F_ '{print $5}')
+name_var=$(echo $trans_name | awk -F_ '{print $1}')
+name_mod=$(echo $trans_name | awk -F_ '{print $2}')
+name_scen=$(echo $trans_name | awk -F_ '{print $3}')
+#name_scen=$(echo $trans_name | awk -F_ '{printf("%s_%s",$2,$3)}') # tasmax_CanESM2_historical_1950_1969
+outdir=/home/raid3/stumbaugh/IS/CONUS/v2.2/splitmon/$name_var/$name_scen/$name_mod
+mkdir -p $outdir splitmon
+cmdfile=splitmon/$trans_name"_SplitMons.txt"
+qsubfile=splitmon/$trans_name"_SplitMons.qsub"
+
+#./gentimesplits.py -s $year_start"0101" -f $year_end"1231" -tf M --date_format "%Y-%m-%d"
+#cdo splitmon $infile /home/raid3/stumbaugh/IS/CONUS/v2.2/splitmon/$trans_name
+
+index_mon=($(seq 0 1 11)) #; echo "${a[2]}"
+
+rm $cmdfile
+for((yr=year_start; yr<=year_end; yr++))
+do
+#im=$(echo "$SGE_TASK_ID-1" | bc -l)
+    starts=($(gentimesplits.py -s $yr"0101" -f $yr"1231" -tf MS)) # Month starts
+    #31 28 31 30 31 30 31 31 30 31 30 31)
+    ends=($(gentimesplits.py --start $yr"0101" --final $yr"1231" --time_frequency M --date_format "%Y-%m-%d")) # Month ends
+#    mondate=$(echo "${starts[im]}" | awk -F- '{printf("%s%s",$1,$2)}')
+#    echo $mondate
+    for im in "${index_mon[@]}"
+    do           
+        ### NO LEAP YEAR HANDLING ###
+        #if [ $im -eq 1 ]
+        #then
+    	#    ends[1]=$(echo ${ends[@]:1} | awk -F- '{printf("%s-%s-%s",$1,$2,28)}')
+    	#fi               
+        echo ncks -h -O -d time,"${starts[im]}","${ends[im]}" $infile $outdir/$out_name_prefix_"${starts[im]}"_"${ends[im]}" >> $cmdfile
+    done
+done
+
+mk_qsub.bsh $qsubfile $cmdfile
+
+#nohup ./splitmon_nco.bsh > log_splitmon_top.txt 2>&1 &
+mkdir -p logs/$trans_name"_SplitMons.qsub"
+#qsub -sync y $qsubfile
+#mv $qsubfile.o*.* logs/$trans_name"_SplitMons.qsub"
+#qsub $qsubfile
+
+fi
+done
+date

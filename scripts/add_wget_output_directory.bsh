@@ -1,0 +1,8 @@
+#!/bin/bash
+#head -n 1 $1 # > $1".out"
+#tail -n +2 $1 | awk -v outdir=$2 '{split($1,a," "); if(a[1]=="wget"){print $0, "-P", outdir}}' $1 # >> $1".out"
+
+awk -v outdir=$2 '{split($1,a," "); if(a[1]=="wget"){print $0, "-P", outdir}}' $1 # >> $1".out"
+
+#awk '{split($0,a," "); print a[1]}' $1
+#print $0, "-P", '"$2"'}' $1 

@@ -1,0 +1,62 @@
+splitfile=$1
+frcdir=$2
+dir_combout=$3
+scen=$4 #"rcp45"
+gcm=$5 #"CanESM2"
+
+#frcdirs=$(echo $storedir/vicfrc/{pr,tasmax,tasmin,was}_cells/$scen/$gcm)
+
+if [ ! -d $dir_combout ]
+then
+    mkdir -p $dir_combout
+fi
+
+if [ 1 -eq 1 ]
+then
+while read line
+do
+    ind=$(echo $line | cut -f1 -d" ")
+    latlon=$(echo $line | cut -f2 -d" ")
+    frcdirs=$(echo $frcdir/{pr,tasmax,tasmin,was}_cells/$scen/$gcm/$ind)
+    
+    fout=$dir_combout/frc4_$latlon
+    paste -d" " $frcdirs > $fout
+    
+: <<-CMT
+    ## MAKE SURE expected files exist. Comment out paste.
+    a=()
+    count=0
+    for fd in $frcdirs
+    do
+        if [ ! -f $fd ]
+        then
+            a=(${a[@]} fd)
+            let count=$count+1
+        fi            
+    done
+
+	if [ $count -gt 0 ]
+	then
+	    echo $count ${a[@]}
+	fi
+CMT
+
+: <<-CMT
+    ## Only paste if expected does not exist or is wrong length
+    ## If wrong length, might also check to make sure constituents are properly formed.
+    fout=$dir_combout/frc4_$latlon
+    if [ ! -f $fout ]
+    then
+        paste -d" " $frcdirs > $fout
+#    else
+#        lines=$(wc -l $fout | awk '{print $1}'); echo $lines
+#        if [ $lines -ne 34675 ]
+#        then        
+#            paste -d" " $frcdirs > $fout
+#            echo  $lines $fout $frcdirs >> log_line_trouble.txt 
+#        fi
+    fi
+CMT
+    
+done < $splitfile
+fi

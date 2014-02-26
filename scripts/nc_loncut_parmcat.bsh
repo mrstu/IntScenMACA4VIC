@@ -1,0 +1,82 @@
+#!/bin/bash
+
+###
+### Creates command files for cutting, catting vars, and transforming lats.
+###
+### EXAMPLE: ./scripts/nc_loncut_parmcat.bsh CanESM2/historical/{var_groups.txt,time_groups.txt} CanESM2
+###          -->    CanESM2/historical/{lt103,cat.lt103,trans_lats}.cfg
+###
+### Inputs: <variable_grouped file> <time_grouped file> <gcm name>
+###
+### Follow up: ~/bin/mk_qsub.bsh lt103.qsub lt103.cfg; qsub lt103.qsub (Wrapping and submitting)
+###
+
+
+vargrpfile=$1
+timegrpfile=$2
+cfgloc=$(dirname $vargrpfile)
+gcm=$3
+baseloc=/raid3/stumbaugh/IS/CONUS/v2/$gcm
+ncinloc=$baseloc
+nccutloc=$baseloc/lt103
+nccatloc=$baseloc/lt103.cat
+nccombloc=$baseloc/lt103.cat.comb
+#prepend_lt103='ncks -d lon,-126.,-103.'
+prepend_lt103='ncks -d lon,234.,257.'
+#prepend_tmaxrename='ncrename -h -O -v air_temperature,air_temp_tmax'
+#prepend_tminrename='ncrename -h -O -v air_temperature,air_temp_tmin'
+#prepend_varmerge='ncks -A' # NCKS can only take two input files
+prepend_varmerge='cdo merge'
+prepend_combperiods='ncecat -u time'
+
+echo $cfgloc
+#exit
+
+mkdir -p $nccutloc $nccatloc $nccombloc
+
+#CONSIDER: read all filenames to array
+if [ 1 -eq 1 ]
+then
+## Slice degrees east longitude 234. to 257. (-126 to -103 for +-180 degrees)
+awk -v indir=$ncinloc -v odir=$nccutloc -v prefix="$prepend_lt103" '{for(i=7;i<=NF;i++){printf("%s %s/%s %s/%s\n", prefix, indir, $i, odir, $i)}}' $vargrpfile > $cfgloc/lt103.cfg
+
+## Rename temperature vars
+##ncrename -h -O -v old_variable_name,new_variable_name filename.nc
+#grep "tasmax\|tasmin"
+awk '{printf("ncrename -h -O -v air_temperature,air_temp_tmax %s\n", $NF)}' $cfgloc/lt103.cfg | grep "tasmax"  > $cfgloc/varrename.cfg
+awk '{printf("ncrename -h -O -v air_temperature,air_temp_tmin %s\n", $NF)}' $cfgloc/lt103.cfg | grep "tasmin" >> $cfgloc/varrename.cfg
+
+#exit
+## Merge vars
+# CDO Merge
+awk -v indir=$nccutloc -v odir=$nccatloc -v prefix="$prepend_varmerge" '{syr=$4; eyr=$5; scen=$3; printf("%s ", prefix); for(i=6;i<NF;i++){printf("%s/%s ", indir, $i)}; printf("%s/%s %s/%s_%d_%d.nc\n", indir, $NF, odir, scen, syr, eyr);}' $timegrpfile > $cfgloc/cat.lt103.cfg
+# NCKS merge (failed b/c can't take more than two input files
+#awk -v indir=$nccutloc -v odir=$nccatloc -v prefix="$prepend_varmerge" '{syr=$4; eyr=$5; scen=$3; catfile=sprintf("%s/%s_%d_%d.nc", odir, scen, syr, eyr); printf("cp %s/%s %s & ", indir, $NF, catfile); printf("%s ", prefix); for(i=6;i<NF;i++){printf("%s/%s ", indir, $i)}; printf("%s\n", catfile);}' $timegrpfile > $cfgloc/cat.lt103.cfg
+#awk -v indir=$nccutloc -v odir=$nccatloc -v prefix="$prepend_varmerge" '{syr=$4; eyr=$5; scen=$3; printf("%s ", prefix); for(i=6;i<NF;i++){printf("%s/%s ", indir, $i)}; printf("%s/%s && mv %s/%s %s/%s_%d_%d.nc\n", indir, $NF, indir, $NF, odir, scen, syr, eyr);}' $timegrpfile > $cfgloc/cat.lt103.cfg
+#exit
+## Transform longitude 0/360 to -180/180 (-126 to -103)
+awk -v indir=$nccatloc '{syr=$4; eyr=$5; scen=$3; printf("changeLonCoord.bsh %s/%s_%d_%d.nc\n", indir, scen, syr, eyr);}' $timegrpfile > $cfgloc/trans_lats.cfg
+fi
+
+## Combine periods
+#awk -v indir="/raid3/stumbaugh/IS/CONUS/v2/lt103.cat" -v odir="/raid3/stumbaugh/IS/CONUS/v2/lt103.cat.comb" -F/ '{split($NF,name_ext,"."); split(name_ext[1],parts,"_"); scen=parts[1]; tmp_min=parts[2]; tmp_max=parts[3]; if(NR==1){max=tmp_max; min=tmp_min;}else{if(tmp_max>max){max=tmp_max};if(tmp_min<min){min=tmp_min};} printf("%s/%s ",indir,$NF);}END{printf("%s/%s_%d_%d.nc\n", odir, scen, min, max)}' trans_lats.cfg
+awk -v indir=$nccatloc -v odir=$nccombloc -F/ -v prefix="$prepend_combperiods" '{split($NF,name_ext,"."); split(name_ext[1],parts,"_"); scen=parts[1]; tmp_min=parts[2]; tmp_max=parts[3]; if(NR==1){max=tmp_max; min=tmp_min;}else{if(tmp_max>max){max=tmp_max};if(tmp_min<min){min=tmp_min};} printf("%s/%s ",indir,$NF);}END{printf("%s/%s_%d_%d.nc\n", odir, scen, min, max)}' $cfgloc/trans_lats.cfg > $cfgloc/comb_periods.cfg
+
+~/bin/mk_qsub.bsh $cfgloc/lt103.qsub lt103.cfg
+~/bin/mk_qsub.bsh $cfgloc/varrename.qsub varrename.cfg
+~/bin/mk_qsub.bsh $cfgloc/cat.lt103.qsub cat.lt103.cfg
+~/bin/mk_qsub.bsh $cfgloc/trans_lats.qsub trans_lats.cfg
+~/bin/mk_qsub.bsh $cfgloc/comb_periods.qsub comb_periods.cfg
+
+rm $cfgloc/master.bsh
+for op in lt103 varrename cat.lt103 trans_lats comb_periods
+do
+    echo qsub -sync y $op".qsub" >> $cfgloc/master.bsh
+done
+
+chmod 744 $cfgloc/master.bsh
+
+## Combine periods???
+#awk -v odir=$nccombloc -F"\" '{splitsyr=$4; eyr=$5; scen=$3; printf("changeLonCoord.bsh %s/%s_%d_%d.nc\n", indir, scen, syr, eyr);}' $cfgloc/trans_lats.cfg > $cfgloc/trans_lats.cfg
+
+#awk -v indir=$nccutloc -v odir=$nccatloc -v prefix="$prepend_cat" '{printf("%s ", prefix); for(i=7;i<NF;i++){printf("%s/%s ", indir, $i)}; printf("%s/%s %s/%s\n", indir, $NF, odir, $NF);}' $vargrpfile > $cfgloc/cat.lt103.cfg

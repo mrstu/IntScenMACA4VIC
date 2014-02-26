@@ -1,0 +1,34 @@
+#!/bin/bash
+
+date
+
+scen=$(basename $(pwd -P))
+gcm=$(basename $(dirname $(pwd -P)))
+
+
+### Scale precip (mm/s to mm/day); CDO convert monthly ncfiles to ascii
+#CONSIDER: moving small monthly-var netCDFs to $node:(/state/partition1 OR /fast) and nc2cell processing locally
+qsub -sync y /home/stumbaugh/downloader/IS/v2.2/scripts/ncLLinds2cells.bsh $scen $gcm
+mv ./precip2mm_day.cfg ./tempC2K.cfg ./nc2txt
+mv ./nc2txt.cfg ./nc2txt
+
+cd ./nc2txt
+qsub -sync y nc2txt.qsub
+cd ..
+### Concat ascii months for var on node local drive
+cd ./catvar_grd2cell
+qsub -sync y catvar.qsub
+cd ..
+### Parallel copy cells from node.local to RAID
+cd ./cellcopy
+## Block until all cells copied.
+/home/stumbaugh/downloader/IS/v2.2/scripts/cellcopy_nd2rd.bsh /raid3/stumbaugh/IS/CONUS/v2.2 /home/stumbaugh/downloader/IS/v2.2/dummy_actives $scen $gcm
+cd ..
+### Combine cells into VIC forcings
+cd ./combvars
+qsub -sync y combactive.qsub
+cd ..
+### DONE preparing VIC forcings.
+
+
+date

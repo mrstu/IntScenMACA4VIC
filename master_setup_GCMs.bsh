@@ -1,0 +1,16 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -S /bin/bash 
+##$ -M mrstu@uw.edu
+##$ -m beas
+#$ -q default.q@compute-0-0,default.q@compute-0-1,default.q@compute-0-2,default.q@compute-2-*
+export PYTHONPATH=/home/stumbaugh:/home/stumbaugh/devel
+export PATH=$PATH:/home/stumbaugh/bin
+
+mods="CanESM2 CCSM4 CNRM-CM5"
+#mods="CNRM-CM5"
+for mod in $mods
+do
+    ./setup_GCM.bsh $mod
+done

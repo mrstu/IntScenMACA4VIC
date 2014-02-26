@@ -1,0 +1,41 @@
+#!/bin/bash
+
+storedir=$1
+splitloc=$2
+scen=$3
+gcm=$4
+
+for nd in 0-0 0-1 0-2
+do
+    for var in pr tasmax tasmin was #huss rsds
+    do    
+        cfgnamebase="cellcopy_"$nd"_"$var
+        nodedir=$(echo /state/partition1/stumbaugh/$var"_cells"/$scen/$gcm)
+        raiddir=$storedir/vicfrc/$var"_cells"/$scen/$gcm
+        mkdir -p $raiddir
+        rm $cfgnamebase".qsub"       
+        nd_has_dir=$(ssh stumbaugh@compute-$nd 'if [ -e '$nodedir' ]; then echo 0; else echo 1; fi')
+        echo $nd $var $nd_has_dir
+        #if [ 0 -eq 0 ]
+        if [ $nd_has_dir -eq 0 ]
+        then  
+            rm $cfgnamebase".cfg"
+            for spl in $(ls $splitloc/splitlists/*)
+            do
+                echo /home/stumbaugh/downloader/IS/v2/scripts/cellsplitmover.bsh $nodedir $raiddir $spl $scen $gcm >> $cfgnamebase".cfg"
+            done
+
+            ~/bin/mk_qsub.bsh $cfgnamebase".qsub" $cfgnamebase".cfg"
+	        sed -i 's/#$ -q.*/#$ -q default.q@compute-'$nd'/g' $cfgnamebase".qsub"
+	        #qsub -sync y $cfgnamebase".qsub"
+        fi
+    done
+done
+
+cd cellcopy
+for qs in $(ls cellcopy_*.qsub)
+do
+    echo "Submitting:" $qs
+    qsub -sync y $qs
+done
+

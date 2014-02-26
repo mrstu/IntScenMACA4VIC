@@ -1,0 +1,14 @@
+#!/bin/bash
+
+##look at logs for resets and get arrayjob number which corresponds
+##to the line of cfg
+# grep -e "reset" *.?? | awk -F[.:] '{print $4}' | sort | uniq | xarg
+
+wget_master="maca_CCSM4.cfg"
+lines=(10 14 18 20 22 24 26 30 32 34 39 41 43 47 49 53 55 57 59 62 64 66 68 70 72 74 76 78)
+rm $wget_master".redo"
+for line in "${lines[@]}"
+do
+    #echo $line
+    awk '{if(NR=='$line'){print $0}}' $wget_master >> $wget_master".redo"
+done

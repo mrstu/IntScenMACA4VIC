@@ -1,0 +1,244 @@
+#!/bin/bash
+
+###
+### Creates command files for cutting, catting vars, and transforming lats.
+###
+### EXAMPLE: ./scripts/nc_loncut_parmcat.bsh CanESM2/historical/{var_groups.txt,time_groups.txt} CanESM2
+###          -->    CanESM2/historical/{lt103,cat.lt103,trans_lats}.cfg
+###
+### Inputs: <variable_grouped file> <time_grouped file> <gcm name>
+###
+### Follow up: ~/bin/mk_qsub.bsh lt103.qsub lt103.cfg; qsub lt103.qsub (Wrapping and submitting)
+###
+
+
+vargrpfile=$1
+timegrpfile=$2
+cfgloc=$(dirname $vargrpfile)
+gcm=$3
+echo $cfgloc
+scen=$(basename $(pwd -P))
+echo $scen
+storedir=$4 #/raid3/stumbaugh/IS/CONUS/v2.2
+baseloc=$storedir/$gcm
+ncinloc=$baseloc
+nccutloc=$baseloc/lt103
+#nccatloc=$baseloc/lt103.cat
+#nccombloc=$baseloc/lt103.cat.comb
+#prepend_lt103='ncks -d lon,-126.,-103.'
+prepend_lt103='ncks -O -d lon,234.,257.'
+#prepend_tmaxrename='ncrename -h -O -v air_temperature,air_temp_tmax'
+#prepend_tminrename='ncrename -h -O -v air_temperature,air_temp_tmin'
+#prepend_varmerge='ncks -A' # NCKS can only take two input files
+prepend_varmerge='cdo merge'
+prepend_combperiods='ncecat -u time'
+
+echo $cfgloc
+#exit
+
+mkdir -p $nccutloc #$nccatloc $nccombloc
+
+#CONSIDER: read all filenames to array
+if [ 1 -eq 1 ]
+then
+## Slice degrees east longitude 234. to 257. (-126 to -103 for +-180 degrees)
+awk -v indir=$ncinloc -v odir=$nccutloc -v prefix="$prepend_lt103" '{for(i=7;i<=NF;i++){printf("%s %s/%s %s/%s\n", prefix, indir, $i, odir, $i)}}' $vargrpfile > $cfgloc/lt103.cfg
+
+## Transform longitude 0/360 to -180/180 (-126 to -103)
+awk '{printf("changeLonCoord.bsh %s\n", $NF)}' $cfgloc/lt103.cfg > $cfgloc/trans_lats.cfg
+
+## Rename temperature vars
+##ncrename -h -O -v old_variable_name,new_variable_name filename.nc
+#grep "tasmax\|tasmin"
+awk '{printf("ncrename -h -O -v air_temperature,air_temp_tmax %s\n", $NF)}' $cfgloc/lt103.cfg | grep "tasmax"  > $cfgloc/varrename.cfg
+awk '{printf("ncrename -h -O -v air_temperature,air_temp_tmin %s\n", $NF)}' $cfgloc/lt103.cfg | grep "tasmin" >> $cfgloc/varrename.cfg
+
+## Rename temperature vars
+##ncrename -h -O -v old_variable_name,new_variable_name filename.nc
+#grep "tasmax\|tasmin"
+awk '{printf("/home/stumbaugh/downloader/IS/v2.2/scripts/splitmon_nco.bsh %s\n", $NF)}' $cfgloc/lt103.cfg > $cfgloc/splitmon.cfg
+
+
+
+## Combine periods
+#awk -v indir="/raid3/stumbaugh/IS/CONUS/v2.2/lt103.cat" -v odir="/raid3/stumbaugh/IS/CONUS/v2.2/lt103.cat.comb" -F/ '{split($NF,name_ext,"."); split(name_ext[1],parts,"_"); scen=parts[1]; tmp_min=parts[2]; tmp_max=parts[3]; if(NR==1){max=tmp_max; min=tmp_min;}else{if(tmp_max>max){max=tmp_max};if(tmp_min<min){min=tmp_min};} printf("%s/%s ",indir,$NF);}END{printf("%s/%s_%d_%d.nc\n", odir, scen, min, max)}' trans_lats.cfg
+awk -v indir=$nccutloc -v odir=$nccombloc -v prefix="$prepend_combperiods" '{scen=$3; var=$4; min=$5; max=$6; printf("%s ",prefix); for(i=7;i<=NF;i++){printf("%s/%s ",indir,$i)}; printf("%s/%s_%s_%d_%d.nc\n", odir, scen, var, min, max)}' $vargrpfile > $cfgloc/comb_periods.cfg
+fi
+
+
+~/bin/mk_qsub.bsh $cfgloc/lt103.qsub lt103.cfg
+~/bin/mk_qsub.bsh $cfgloc/varrename.qsub varrename.cfg
+~/bin/mk_qsub.bsh $cfgloc/trans_lats.qsub trans_lats.cfg
+# limit trans_lats to array job chunks of 15
+sed -i 's/##$ -tc/#$ -tc 15/g' $cfgloc/trans_lats.qsub
+#~/bin/mk_qsub.bsh $cfgloc/cat.lt103.qsub cat.lt103.cfg
+#~/bin/mk_qsub.bsh $cfgloc/comb_periods.qsub comb_periods.cfg
+~/bin/mk_qsub.bsh $cfgloc/splitmon.qsub splitmon.cfg
+
+rm $cfgloc/master.bsh
+
+echo '#!/bin/bash' >> $cfgloc/master.bsh
+echo >> $cfgloc/master.bsh
+echo 'date' >> $cfgloc/master.bsh
+echo >> $cfgloc/master.bsh
+echo 'scen=$(basename $(pwd -P))'  >> $cfgloc/master.bsh
+echo 'gcm=$(basename $(dirname $(pwd -P)))'  >> $cfgloc/master.bsh
+#echo 'scen='$scen >> $cfgloc/master.bsh
+#echo 'gcm='$gcm >> $cfgloc/master.bsh
+echo >> $cfgloc/master.bsh
+echo '### Large NetCDFs: contract to WUS; trans lons to +/-180; disagg to days by month' >> $cfgloc/master.bsh
+for op in lt103 trans_lats varrename splitmon
+do
+    echo qsub -sync y $op".qsub" >> $cfgloc/master.bsh
+done
+
+echo 'cd splitmon' >> $cfgloc/master.bsh
+# limit splitmon/*.qsub to array job chunks of 10
+echo '/home/stumbaugh/downloader/IS/v2.2/scripts/reformat_splitmons.bsh' >> $cfgloc/master.bsh
+
+echo 'for q in $(ls *.qsub); do qsub -sync y -tc 30 $q; done' >> $cfgloc/master.bsh
+
+echo 'cd ..' >> $cfgloc/master.bsh
+
+echo '### Scale precip (mm/s to mm/day); CDO convert monthly ncfiles to ascii' >> $cfgloc/master.bsh
+
+#echo '/home/stumbaugh/downloader/IS/v2.2/scripts/ncLLinds2cells.bsh' $scen $gcm >> $cfgloc/master.bsh
+echo '#CONSIDER: moving small monthly-var netCDFs to $node:(/state/partition1 OR /fast) and nc2cell processing locally' >> $cfgloc/master.bsh
+echo 'qsub -sync y /home/stumbaugh/downloader/IS/v2.2/scripts/ncLLinds2cells.bsh $scen $gcm' >> $cfgloc/master.bsh
+
+mkdir -p $cfgloc/nc2txt; 
+
+#echo mv $cfgloc/precip2mm_day.cfg $cfgloc/tempC2K.cfg $cfgloc/nc2txt >> $cfgloc/master.bsh
+echo mv $cfgloc/tempC2K.cfg $cfgloc/nc2txt >> $cfgloc/master.bsh
+echo mv $cfgloc/nc2txt.cfg $cfgloc/nc2txt >> $cfgloc/master.bsh
+echo cd $cfgloc/nc2txt >> $cfgloc/master.bsh
+#echo '~/bin/mk_qsub.bsh' precip2mm_day.qsub precip2mm_day.cfg >> $cfgloc/master.bsh
+echo '~/bin/mk_qsub.bsh' tempC2K.qsub tempC2K.cfg >> $cfgloc/master.bsh
+echo '~/bin/mk_qsub.bsh' nc2txt.qsub nc2txt.cfg >> $cfgloc/master.bsh
+# limit array job concurrency to 30
+#echo "sed -i 's/##$ -tc.*/#$ -tc 30/g'" precip2mm_day.qsub tempC2K.qsub nc2txt.qsub >> $cfgloc/master.bsh
+echo "sed -i 's/##$ -tc.*/#$ -tc 30/g'" tempC2K.qsub nc2txt.qsub >> $cfgloc/master.bsh
+#echo qsub -sync y precip2mm_day.qsub >> $cfgloc/master.bsh
+echo qsub -sync y tempC2K.qsub >> $cfgloc/master.bsh
+echo qsub -sync y nc2txt.qsub >> $cfgloc/master.bsh
+echo 'cd ..' >> $cfgloc/master.bsh
+
+#egoodcols="/home/stumbaugh/downloader/IS/v2.2/dummy_valinds.txt"
+#splitloc="/home/stumbaugh/downloader/IS/v2.2/dummy_valinds"
+##~/bin/mksplitlists "/home/stumbaugh/downloader/IS/v2.2/dummy_valinds.txt" /home/stumbaugh/downloader/IS/v2.2/dummy_valinds 3000
+#~/bin/mksplitlists $egoodcols $splitloc 3000
+
+#mkdir -p $cfgloc/gridactive
+#echo cd $cfgloc/gridactive >> $cfgloc/master.bsh
+#cd $cfgloc/gridactive
+#rm grdactive.cfg
+
+## Get month text grid file row number and filename
+#dtimes=($(awk '{if(NF==2){print $1}}' /home/stumbaugh/downloader/IS/v2.2/numdata_rcp45.tmp))
+#infiles=($(awk -F/ '{if(NF>2){print $NF}}' /home/stumbaugh/downloader/IS/v2.2/numdata_rcp45.tmp))
+
+#
+# CONCATENATE MONTHLY ASCII FILES BY VARIABLE ON $NODE/state/partition1
+#
+echo '### Concat ascii months for var on node local drive' >> $cfgloc/master.bsh
+
+subcfgloc=$cfgloc/catvar_grd2cell
+mkdir -p $subcfgloc
+syncdir=$(pwd -P)/sync
+mkdir -p $subcfgloc $syncdir
+echo cd $subcfgloc >> $cfgloc/master.bsh
+
+cd $subcfgloc
+    
+#cat ~/sge_temple/sge_tmp_1j.txt  >> "catvar.qsub"
+#echo '#$ -q default.q@compute-0-0,default.q@compute-0-1,default.q@compute-0-2' >> "catvar.qsub"
+#~/bin/qsub_add_path.bsh >> "catvar.qsub"
+rm "catvar.cfg"
+for var in pr tasmax tasmin was #huss rsds
+do
+    echo /home/stumbaugh/downloader/IS/v2.2/scripts/catvar_grd2cell.bsh $var $scen $gcm $syncdir >> "catvar.cfg"
+    #echo cell_to_file /home/stumbaugh/downloader/IS/v2.2/dummy.nc.flatij.valinds.txt  5 self.numdata self.outpath) >> grdactive.cfg
+done
+~/bin/mk_qsub.bsh catvar.qsub catvar.cfg
+sed -i 's/#$ -q.*/#$ -q default.q@compute-0-0,default.q@compute-0-1,default.q@compute-0-2/' catvar.qsub
+~/bin/cfg_qsub_msgOn.bsh catvar.qsub
+##$ -m beas
+cd ..
+echo qsub -sync y catvar.qsub >> $cfgloc/master.bsh
+echo 'cd ..' >> $cfgloc/master.bsh
+echo 
+
+#
+# CREATE SPLITLISTS FOR CELL INDEX:LATLON
+#
+
+subcfgloc=$cfgloc/catvar_grd2cell
+egoodcols="/home/stumbaugh/downloader/IS/v2.2/dummy.nc.active.ind2LL.txt"
+splitloc="/home/stumbaugh/downloader/IS/v2.2/dummy_actives"
+##~/bin/mksplitlists "/home/stumbaugh/downloader/IS/v2.2/dummy_valinds.txt" /home/stumbaugh/downloader/IS/v2.2/dummy_valinds 3000
+~/bin/mksplitlists $egoodcols $splitloc 3000
+
+#
+# COPY 1CELL-1VAR ASCII (INDEX FILENAME) FROM $NODE/state/partition1 TO RAID3
+#
+echo '### Parallel copy cells from node.local to RAID' >> $cfgloc/master.bsh
+
+subcfgloc=$cfgloc/cellcopy
+mkdir -p $subcfgloc
+syncdir=$(pwd -P)/sync_copy
+mkdir -p $subcfgloc $syncdir
+echo cd $subcfgloc >> $cfgloc/master.bsh
+
+echo '## Block until all cells copied.' >> $cfgloc/master.bsh
+echo /home/stumbaugh/downloader/IS/v2.2/scripts/cellcopy_nd2rd.bsh $storedir $splitloc' $scen $gcm' >> $cfgloc/master.bsh
+
+echo 'cd ..' >> $cfgloc/master.bsh
+echo 
+
+#
+# Early attempt at gridactive python approach?
+#
+
+#mkdir -p $cfgloc/gridactive
+#echo cd $cfgloc/gridactive >> $cfgloc/master.bsh
+#cd $cfgloc/gridactive
+#rm grdactive.cfg
+
+#
+# COMBINE 1CELL-1VAR ASCII (INDEX FILENAME) TO CAT4 (LL FILENAME)
+#
+echo '### Combine cells into VIC forcings' >> $cfgloc/master.bsh
+
+#frcdirs=$(echo $storedir/vicfrc/{pr,tasmax,tasmin,was}_cells/$scen/$gcm)
+frcdir=$storedir/vicfrc
+dir_combout=$storedir/vicfrc/cat4/$scen/$gcm
+mkdir -p $dir_combout
+
+mkdir -p $cfgloc/combvars
+echo cd $cfgloc/combvars >> $cfgloc/master.bsh
+cd $cfgloc/combvars
+rm combactive.cfg 
+
+for splt in $(ls $splitloc/splitlists/*)
+do
+    echo /home/stumbaugh/downloader/IS/v2.2/scripts/combvars.bsh $splt $frcdir $dir_combout $scen $gcm >> combactive.cfg 
+done
+
+~/bin/mk_qsub.bsh combactive.qsub combactive.cfg
+
+cd ..
+echo qsub -sync y combactive.qsub >> $cfgloc/master.bsh
+echo 'cd ..' >> $cfgloc/master.bsh
+echo 
+
+chmod 744 $cfgloc/master.bsh
+
+echo '### DONE preparing VIC forcings.' >> $cfgloc/master.bsh
+
+echo >> $cfgloc/master.bsh
+echo 'date' >> $cfgloc/master.bsh
+
+## Combine periods???
+#awk -v odir=$nccombloc -F"\" '{splitsyr=$4; eyr=$5; scen=$3; printf("changeLonCoord.bsh %s/%s_%d_%d.nc\n", indir, scen, syr, eyr);}' $cfgloc/trans_lats.cfg > $cfgloc/trans_lats.cfg
+
+#awk -v indir=$nccutloc -v odir=$nccatloc -v prefix="$prepend_cat" '{printf("%s ", prefix); for(i=7;i<NF;i++){printf("%s/%s ", indir, $i)}; printf("%s/%s %s/%s\n", indir, $NF, odir, $NF);}' $vargrpfile > $cfgloc/cat.lt103.cfg

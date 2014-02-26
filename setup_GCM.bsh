@@ -1,0 +1,41 @@
+#!/bin/bash
+
+wget_master="maca_GCM_files_template.txt" #macav2livneh_CONUS_wget.sh"
+gcm=$1 #"CCSM4" #CSIRO-Mk3-6-0
+
+sed 's|GCM|'$gcm'|g' $wget_master > maca_$gcm".txt"
+
+#grep "$gcm" $wget_master > maca_$gcm".txt"
+cat maca_$gcm".txt" | awk '{print $NF}' > maca_$gcm"_path.txt"
+
+## If the raw MACA files are located elsewhere, then a link to the GCM directory needs to be made here
+## this is important
+outdir=/raid3/stumbaugh/IS/CONUS/v2.2
+outdir2=/raid2/stumbaugh/IS/CONUS/v2.2
+mkdir -p $outdir
+
+./scripts/mod_scen_split.bsh $gcm maca_$gcm"_path.txt" $outdir
+
+# Orchestrate download
+
+./scripts/add_wget_output_directory.bsh maca_$gcm".txt" $outdir/$gcm | sed 's|-nd|-nd --no-verbose|g' > maca_$gcm".cfg"
+
+~/bin/mk_qsub.bsh maca_$gcm".qsub" maca_$gcm".cfg"
+
+sed -i 's/##$ -tc.*/#$ -tc 10/g' maca_$gcm".qsub"
+
+## create link to mirror on raid2 for raw maca files
+if [ ! -L $outdir/$gcm ]
+then 
+	mv $outdir/$gcm $outdir2
+	ln -s $outdir2/$gcm $outdir/$gcm
+fi
+
+## create scenario specific download scripts
+for scen in historical rcp45 rcp85
+do
+    grep "$scen" maca_$gcm".cfg" > maca_$gcm"_"$scen".cfg"
+    mk_qsub.bsh maca_$gcm"_"$scen".qsub" maca_$gcm"_"$scen".cfg"
+done
+
+# for i in $(ls *.nc); do oname=$(echo $i | sed 's/CSIRO/daily_CSIRO/g'); mv $i $oname; done

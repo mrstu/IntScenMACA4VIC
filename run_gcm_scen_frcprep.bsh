@@ -1,0 +1,81 @@
+#!/bin/bash
+
+gcm=CSIRO-Mk3-6-0
+rundirname="wus_full.1"
+#scen=rcp85
+scen=rcp45
+
+
+: <<-CMT
+## download files
+qsub -sync y maca_$gcm"_"$scen".qsub"
+CMT
+
+## prepare forcings
+# in place of (cd $gcm/historical/; ./run_master.bsh)
+(
+cd $gcm/$scen/
+date_stamp=$(date +"%F-%H-%M")
+./master.bsh > "log_master_$date_stamp.txt" 2>&1
+)
+
+(
+cd /home/raid3/stumbaugh/IS/CONUS/v2.2/simulator/setup
+echo $(pwd -P)
+./setup_vic_sim.bsh $scen $gcm $rundirname
+
+# only run model if expected number of forcings
+if [ $? -eq 0 ]
+then
+    # clean up 1-col forcings and splitmon text (spinoff -- no sync)
+    # wipe nodes independently (not included here)
+	cd ../..
+	./clean_vicfrc_scen_gcm.bsh $scen $gcm
+    #TODO: move some variables to setup/projenvs.bsh
+    cd simulator
+	./run_vic_part.bsh $scen $gcm
+else
+    echo "ABORTING: failed expected number of forcings test"
+fi
+)
+
+: <<-CMT
+## AFTER SPLITCAT ##
+#for rcp in rcp85 #rcp45 
+for rcp in rcp45 
+do
+    for gcm in CCSM4 CNRM-CM5 #CanESM2 #CCSM4 CNRM-CM5
+    do
+        cp scripts_static/master_split2cat.bsh $gcm/$rcp
+        cd $gcm/$rcp
+        #mv master.bsh master_all.bsh
+        cp master_split2cat.bsh master.bsh
+        ./run_master.bsh
+        cd ../..
+    done
+done
+CMT
+
+
+: <<-CMT
+##Do one rcp first and rcp85 preferentially... actually this gets sent to SGE and preference is lost
+for rcp in rcp85 rcp45 
+do
+	for gcm in CCSM4 CNRM-CM5
+	do
+	    cp scripts_static/master_thru_splitmon.bsh $gcm/$rcp
+	    cd $gcm/$rcp
+	    mv master.bsh master_all.bsh
+        cp master_thru_splitmon.bsh master.bsh
+	    ./run_master.bsh
+	    cd ../..
+    done
+done
+CMT
+
+: <<-CMT
+for gcm in CanESM2 CCSM4
+do
+    (cd $gcm/historical/; ./run_master.bsh)
+done
+CMT

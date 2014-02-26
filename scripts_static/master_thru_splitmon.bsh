@@ -1,0 +1,51 @@
+#!/bin/bash
+
+date
+
+scen=$(basename $(pwd -P))
+gcm=$(basename $(dirname $(pwd -P)))
+
+### Large NetCDFs: contract to WUS; trans lons to +/-180; disagg to days by month
+qsub -sync y lt103.qsub
+qsub -sync y trans_lats.qsub
+qsub -sync y varrename.qsub
+qsub -sync y splitmon.qsub
+cd splitmon
+/home/stumbaugh/downloader/IS/v2.2/scripts/reformat_splitmons.bsh
+for q in $(ls *.qsub); do qsub -sync y -tc 30 $q; done
+cd ..
+### Scale precip (mm/s to mm/day); CDO convert monthly ncfiles to ascii
+#CONSIDER: moving small monthly-var netCDFs to $node:(/state/partition1 OR /fast) and nc2cell processing locally
+qsub -sync y /home/stumbaugh/downloader/IS/v2.2/scripts/ncLLinds2cells.bsh $scen $gcm
+mv ./precip2mm_day.cfg ./tempC2K.cfg ./nc2txt
+mv ./nc2txt.cfg ./nc2txt
+cd ./nc2txt
+~/bin/mk_qsub.bsh precip2mm_day.qsub precip2mm_day.cfg
+~/bin/mk_qsub.bsh tempC2K.qsub tempC2K.cfg
+~/bin/mk_qsub.bsh nc2txt.qsub nc2txt.cfg
+sed -i 's/##$ -tc.*/#$ -tc 30/g' precip2mm_day.qsub tempC2K.qsub nc2txt.qsub
+qsub -sync y precip2mm_day.qsub
+qsub -sync y tempC2K.qsub
+
+: <<-CMT
+
+qsub -sync y nc2txt.qsub
+cd ..
+### Concat ascii months for var on node local drive
+cd ./catvar_grd2cell
+qsub -sync y catvar.qsub
+cd ..
+### Parallel copy cells from node.local to RAID
+cd ./cellcopy
+## Block until all cells copied.
+/home/stumbaugh/downloader/IS/v2.2/scripts/cellcopy_nd2rd.bsh /raid3/stumbaugh/IS/CONUS/v2.2 /home/stumbaugh/downloader/IS/v2.2/dummy_actives $scen $gcm
+cd ..
+### Combine cells into VIC forcings
+cd ./combvars
+qsub -sync y combactive.qsub
+cd ..
+### DONE preparing VIC forcings.
+
+CMT
+
+date

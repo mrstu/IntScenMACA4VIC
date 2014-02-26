@@ -1,0 +1,37 @@
+#!/bin/bash
+
+gcm=$1
+scen=$2
+
+genre=$scen/$gcm
+
+
+mkdir cleannodes
+rm cleannodes/run_cleannode_$gcm"_"$scen".bsh"
+
+## READ sync file for host/var to move across network
+for isync in $(ls $gcm/$scen/sync/*) # have to drop down a directory
+do
+    nd=$(grep "HOSTNAME" $isync | awk -F[=.] '{print $2}')
+    ndnum=$(echo $nd | cut -d- -f2-)
+    var=$(basename $isync | cut -d_ -f1)
+	cfgnamebase="nodeclean_"$gcm"_"$scen"_"$ndnum"_"$var
+	cd cleannodes
+	nodedircells=$(echo /state/partition1/stumbaugh/$var"_cells"/$genre)
+    nodedircat=$(echo /state/partition1/stumbaugh/$var"_catted"/$genre)	
+	rm $cfgnamebase".qsub"
+
+	echo $nd $var
+    rm $cfgnamebase".cfg"
+    echo rm -rf $nodedircells >> $cfgnamebase".cfg"
+    echo rm -rf $nodedircat >> $cfgnamebase".cfg"    
+
+    ~/bin/mk_qsub.bsh $cfgnamebase".qsub" $cfgnamebase".cfg"
+    sed -i 's/#$ -q.*/#$ -q default.q@compute-'$ndnum'/g' $cfgnamebase".qsub"    
+    echo qsub $cfgnamebase".qsub" >> run_cleannode_$gcm"_"$scen".bsh"
+    cd ..
+    
+done
+
+chmod 744 cleannodes/run_cleannode_$gcm"_"$scen".bsh"
+echo "To clean nodes for" $gcm"-"$scen", run:" '(cd cleannodes; ./run_cleannode_'$gcm"_"$scen".bsh"')'
