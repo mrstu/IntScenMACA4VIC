@@ -8,8 +8,8 @@
 export PYTHONPATH=/home/stumbaugh:/home/stumbaugh/devel
 export PATH=$PATH:/home/stumbaugh/bin
 
-mods="CanESM2 CCSM4 CNRM-CM5"
-#mods="CNRM-CM5"
+#mods="CanESM2 CCSM4 CNRM-CM5"
+mods="CNRM-CM5 CanESM2"
 for mod in $mods
 do
     ./setup_GCM.bsh $mod

@@ -5,6 +5,9 @@ gcm=$1 #"CCSM4" #CSIRO-Mk3-6-0
 
 sed 's|GCM|'$gcm'|g' $wget_master > maca_$gcm".txt"
 
+## special substitution for Livneh gridmet
+#sed -i 's|2005|2010|g' maca_$gcm".txt"
+
 #grep "$gcm" $wget_master > maca_$gcm".txt"
 cat maca_$gcm".txt" | awk '{print $NF}' > maca_$gcm"_path.txt"
 

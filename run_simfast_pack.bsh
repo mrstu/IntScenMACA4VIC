@@ -1,25 +1,26 @@
 #!/bin/bash
 
-
 scen=$1
 gcm=$2
 nccfg=$3
-
-numsplits=90
-
 #gcm=CSIRO-Mk3-6-0
 #gcm=IPSL-CM5A-MR
-rundirname="wus_full.1"
+rundirname="wus_full.1" # this is hardcoded in simulator/run_sub_vic_fast.bsh
 #scen=historical
-#scen=rcp85
 #scen=rcp45
+##scen=rcp85
+#nccfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP45.cfg
 
+function countsuccess() { 
+    tail "$@" | grep -e "EXIT_STATUS" | awk -F[=\ ] '{if($2==0){sum+=1}}END{print sum}'
+}
 
-: <<-CMT
+#: <<-CMT
 ## download files
 qsub -sync y maca_$gcm"_"$scen".qsub"
-CMT
+#CMT
 
+#: <<-CMT
 ## prepare forcings
 # in place of (cd $gcm/historical/; ./run_master.bsh)
 (
@@ -27,8 +28,8 @@ cd $gcm/$scen/
 date_stamp=$(date +"%F-%H-%M")
 ./master.bsh > "log_master_$date_stamp.txt" 2>&1
 )
+#CMT
 
-#exit
 (
 cd /home/raid3/stumbaugh/IS/CONUS/v2.2/simulator/setup
 echo $(pwd -P)
@@ -41,29 +42,23 @@ then
     # wipe nodes independently (not included here)
 	cd ../..
 	./clean_vicfrc_scen_gcm.bsh $scen $gcm
-
-    ## Package forcings
-    cd vicfrcnc
-    qsub -N "frc_"$scen"_"$gcm frc2blk2nc.bsh $scen/$gcm setup/projMACARCP.bsh
-    cd ..
-    
     ##TODO: move some variables to setup/projenvs.bsh
-    cd simulator       
-        
+    cd simulator
 	./run_vic_part.bsh $scen $gcm
-	## tc 35 nice for keeping procs open
-	#(cd $scen/$gcm/wus_full.1; qsub -tc 35 -sync y aj_vic.bsh.qsub)
-    ## run wide open; no job concurrency limit
-    (cd $scen/$gcm/wus_full.1; qsub -sync y aj_vic.bsh.qsub)
-    
     jque=()
     #jobnum=9
     #for i in {8..60} # a restart here. had to remove packcmds_part9.qsub.o*
     jobnum=1
-	for((i=$0;i<=$numsplits;i++))
-	do
+    for i in {0..60}
+    do
         subdom=$(printf "%02d" $i)
-
+        numgrandchildren=50
+        ./run_sub_vic_fast.bsh $scen $gcm $subdom $numgrandchildren
+        wait
+        (
+        cd $scen/$gcm/$rundirname
+        qsub -o logs -sync y revic_$subdom"_"$numgrandchildren".qsub"
+        )
         ./run_packfluxpart.bsh $scen/$gcm/$rundirname $nccfg part$jobnum $jobnum
         
         ## this is really nasty, I know.
@@ -117,8 +112,6 @@ then
 
          
     done
-        
-    
 else
     echo "ABORTING: failed expected number of forcings test"
 fi

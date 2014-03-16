@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#
+# In order to keep historical run statefiles properly formed, can't run them fast.
+#
+
+gcm=IPSL-CM5A-MR
+
+scen=rcp45
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP45.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
+
+scen=rcp85
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP85.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
+
+gcm=CanESM2
+scen=historical
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_HIST.cfg
+#nohup ./run_gcm_scen_frcprep.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
+
+gcm=CNRM-CM5
+scen=historical
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_HIST.cfg
+#nohup ./run_gcm_scen_frcprep.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
+
+gcm=CanESM2
+scen=rcp45
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP45.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm"_part9-60.txt" 2>&1 &
+#                                                                                        #
+# MODIFIED run_simfast... for partial run                                                #
+##########################################################################################
+
+gcm=CanESM2
+scen=rcp85
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP85.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 &
+
+## FULL THROTTLE SIM
+gcm=LID-V1110
+scen=historical
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_HIST.cfg
+#nohup ./run_gcm_scen_frcprep.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
+
+## These are updated MACA versions (Katherine fixing CAN bias correction and re-correction of some CONUS cell)
+
+## For CNRM-CM5, the historical run was completed pre-update
+gcm=CNRM-CM5
+scen=rcp45
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP45.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 &
+
+## For CNRM-CM5, the historical run was completed pre-update
+gcm=CNRM-CM5
+scen=rcp85
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_RCP85.cfg
+#nohup ./run_simfast_pack.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 &
+
+##
+## These are COMPUTTREELINE=12 runs (for updates per above).
+## Packaging now included: proceeds one split at a time thru nclites and removed input files.
+##
+gcm=CCSM4
+scen=historical
+cfg=cfg_flux2nc/vic2ncBlocks_MACA_HIST.cfg
+nohup ./run_gcm_scen_frcprep.bsh $scen $gcm $cfg > log_fast_$scen"_"$gcm".txt" 2>&1 & 
